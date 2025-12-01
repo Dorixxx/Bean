@@ -1,0 +1,5 @@
+{
+  "name": "拼豆大师",
+  "description": "专业的拼豆图纸设计工具。支持自定义色卡、独立编号、将图片转换为像素图纸。",
+  "requestFramePermissions": []
+}
