@@ -1,8 +1,8 @@
 
-import { BeadColor, PalettePreset, RGB, BrandConfig } from './types';
+import { BeadColor, PalettePreset, RGB, Brand } from './types';
 
 // ==========================================
-// 辅助函数：Hex 转 RGB
+// 辅助函数
 // ==========================================
 function hexToRgb(hex: string): RGB {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -15,10 +15,6 @@ function hexToRgb(hex: string): RGB {
     : { r: 0, g: 0, b: 0 };
 }
 
-// 辅助函数：快速创建颜色定义
-// id: 色号 (图纸上显示的文字)
-// name: 颜色名称 (统计清单显示的文字)
-// hex: 颜色值
 const c = (id: string, name: string, hex: string): BeadColor => ({
   id,
   name,
@@ -27,167 +23,165 @@ const c = (id: string, name: string, hex: string): BeadColor => ({
 });
 
 // ==========================================
-// 1. 颜色库配置 (Master Color Library)
-// 您可以在这里配置所有的颜色、ID 和 Hex 值
+// 品牌配置 1: Artkal (S系列硬豆)
+// 这是一个偏向专业、色彩丰富的品牌
 // ==========================================
 
-// 模拟一个完整的大师级色系 (Artkal/Perler 风格)
-const MASTER_LIBRARY = [
-  // --- 黑白灰系列 ---
+const ARTKAL_MASTER_COLORS: BeadColor[] = [
   c('S01', '白色', '#FFFFFF'),
   c('S02', '黑色', '#000000'),
-  c('S03', '浅灰', '#D3D3D3'),
-  c('S04', '灰色', '#808080'),
-  c('S05', '深灰', '#555555'),
-  c('S06', '炭黑', '#333333'),
-  c('S07', '乳白', '#FFFDD0'),
-  c('S08', '透明', '#F0F8FF'),
-
-  // --- 红色/粉色系列 ---
-  c('R01', '大红', '#FF0000'),
-  c('R02', '深红', '#8B0000'),
-  c('R03', '酒红', '#800000'),
-  c('R04', '玫瑰红', '#FF007F'),
-  c('R05', '粉红', '#FFC0CB'),
-  c('R06', '亮粉', '#FF69B4'),
-  c('R07', '热粉', '#FF1493'),
-  c('R08', '桃红', '#EE82EE'),
-  c('R09', '肉粉', '#FA8072'),
-  c('R10', '珊瑚红', '#FF7F50'),
-  c('R11', '胭脂红', '#DC143C'),
-  c('R12', '三文鱼', '#FA8072'),
-
-  // --- 橙色/黄色系列 ---
-  c('O01', '橙色', '#FFA500'),
-  c('O02', '深橙', '#FF8C00'),
-  c('O03', '焦橙', '#CC5500'),
-  c('O04', '橘黄', '#FFD700'),
-  c('Y01', '柠檬黄', '#FFFF00'),
-  c('Y02', '蛋黄', '#FFCC00'),
-  c('Y03', '淡黄', '#FFFFE0'),
-  c('Y04', '土黄', '#DAA520'),
-  c('Y05', '杏色', '#FFEBCD'),
-  c('Y06', '荧光黄', '#CCFF00'),
-
-  // --- 绿色系列 ---
-  c('G01', '绿色', '#008000'),
-  c('G02', '深绿', '#006400'),
-  c('G03', '草绿', '#7CFC00'),
-  c('G04', '酸橙绿', '#32CD32'),
-  c('G05', '薄荷绿', '#98FB98'),
-  c('G06', '橄榄绿', '#808000'),
-  c('G07', '墨绿', '#2F4F4F'),
-  c('G08', '海藻绿', '#2E8B57'),
-  c('G09', '荧光绿', '#00FF00'),
-  c('G10', '松石绿', '#40E0D0'),
-  c('G11', '青瓷', '#AFEEEE'),
-  c('G12', '苹果绿', '#8DB600'),
-
-  // --- 蓝色系列 ---
-  c('B01', '蓝色', '#0000FF'),
-  c('B02', '深蓝', '#00008B'),
-  c('B03', '海军蓝', '#000080'),
-  c('B04', '天蓝', '#87CEEB'),
-  c('B05', '浅蓝', '#ADD8E6'),
-  c('B06', '宝蓝', '#4169E1'),
-  c('B07', '青色', '#00FFFF'),
-  c('B08', '孔雀蓝', '#008080'),
-  c('B09', '午夜蓝', '#191970'),
-  c('B10', '钢蓝', '#4682B4'),
-  c('B11', '冰蓝', '#F0F8FF'),
-  c('B12', '电光蓝', '#7DF9FF'),
-
-  // --- 紫色系列 ---
-  c('P01', '紫色', '#800080'),
-  c('P02', '深紫', '#4B0082'),
-  c('P03', '紫罗兰', '#EE82EE'),
-  c('P04', '薰衣草', '#E6E6FA'),
-  c('P05', '洋红', '#FF00FF'),
-  c('P06', '梅红', '#DDA0DD'),
-  c('P07', '葡萄紫', '#663399'),
-  c('P08', '丁香', '#C8A2C8'),
-
-  // --- 棕色/大地色系列 ---
-  c('BR1', '棕色', '#A52A2A'),
-  c('BR2', '深棕', '#5C4033'),
-  c('BR3', '巧克力', '#D2691E'),
-  c('BR4', '卡其', '#F0E68C'),
-  c('BR5', '米色', '#F5F5DC'),
-  c('BR6', '沙色', '#C2B280'),
-  c('BR7', '赭石', '#CC7722'),
-  c('BR8', '红棕', '#804000'),
-  c('BR9', '小麦', '#F5DEB3'),
-  
-  // --- 肤色系列 ---
-  c('SK1', '肤色', '#FFE0BD'),
-  c('SK2', '浅肤', '#FFCD94'),
-  c('SK3', '深肤', '#EAC086'),
-  c('SK4', '晒黑', '#D2B48C'),
+  c('S03', '浅灰', '#C0C0C0'),
+  c('S04', '深灰', '#808080'),
+  c('S05', '大红', '#FF0000'),
+  c('S06', '玫瑰红', '#FF007F'),
+  c('S07', '粉红', '#FFC0CB'),
+  c('S08', '橙色', '#FFA500'),
+  c('S09', '黄色', '#FFFF00'),
+  c('S10', '浅黄', '#FFFFE0'),
+  c('S11', '绿色', '#008000'),
+  c('S12', '嫩绿', '#90EE90'),
+  c('S13', '天蓝', '#87CEEB'),
+  c('S14', '深蓝', '#00008B'),
+  c('S15', '紫色', '#800080'),
+  c('S16', '浅紫', '#DDA0DD'),
+  c('S17', '棕色', '#A52A2A'),
+  c('S18', '肉色', '#FFDAB9'),
+  c('S19', '透明', '#F0F8FF'),
+  c('S20', '荧光绿', '#00FF00'),
+  c('S21', '荧光橙', '#FF4500'),
+  c('S22', '荧光粉', '#FF69B4'),
+  c('S23', '奶油', '#FFFDD0'),
+  c('S24', '薄荷', '#98FB98'),
+  // 模拟扩展到 72 色 (此处为代码简洁省略部分，实际配置可写满)
+  c('S25', '薰衣草', '#E6E6FA'),
+  c('S26', '海军蓝', '#000080'),
+  c('S27', '蓝绿', '#008080'),
+  c('S28', '橄榄', '#808000'),
+  c('S29', '紫红', '#C71585'),
+  c('S30', '赭石', '#A0522D'),
 ];
 
-// 为了演示 144 色，如果上面的列表不够，我们程序生成补足
-// 在实际配置文件中，您可以手动列出所有 144 个特定的颜色
-const fillTo144 = (): BeadColor[] => {
-  const current = [...MASTER_LIBRARY];
-  let i = 1;
-  while (current.length < 144) {
-    const base = MASTER_LIBRARY[i % MASTER_LIBRARY.length];
-    // 生成变体
-    const factor = i % 2 === 0 ? 1.2 : 0.8; 
-    const r = Math.min(255, Math.floor(base.rgb.r * factor));
-    const g = Math.min(255, Math.floor(base.rgb.g * factor));
-    const b = Math.min(255, Math.floor(base.rgb.b * factor));
-    const hex = '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
-    
-    current.push(c(`X${i}`, `${base.name}-变体${i}`, hex));
-    i++;
-  }
-  return current;
+// 自动填充 Artkal 剩余颜色以模拟大数据集
+for(let i=31; i<=144; i++) {
+   const base = ARTKAL_MASTER_COLORS[i % 30];
+   ARTKAL_MASTER_COLORS.push(c(`S${i}`, `${base.name}-变体`, base.hex)); 
+   // 在真实场景中，这里应手动配置真实的 Hex
+}
+
+const ARTKAL_BRAND: Brand = {
+  id: 'artkal_s',
+  name: 'Artkal (S系列硬豆)',
+  description: '色彩丰富，适合专业像素画，融合度高。',
+  colors: ARTKAL_MASTER_COLORS,
+  presets: [
+    {
+      id: 'ak-24',
+      name: '新手包 24 色',
+      description: '基础常用色',
+      colors: ARTKAL_MASTER_COLORS.slice(0, 24),
+    },
+    {
+      id: 'ak-72',
+      name: '进阶装 72 色',
+      description: '标准全色系，覆盖大部分需求',
+      colors: ARTKAL_MASTER_COLORS.slice(0, 72),
+    },
+    {
+      id: 'ak-144',
+      name: '大师级 144 色',
+      description: '极致色彩表现',
+      colors: ARTKAL_MASTER_COLORS.slice(0, 144),
+    }
+  ]
 };
 
-const FULL_144_SET = fillTo144();
-
-
 // ==========================================
-// 2. 套装/配置定义 (Palette Presets)
-// 这里定义用户可以在下拉菜单中选择的选项
+// 品牌配置 2: Perler (P系列)
+// 这是一个经典的美国品牌，色号系统完全不同
 // ==========================================
 
-export const PALETTE_PRESETS: PalettePreset[] = [
-  {
-    id: 'basic-48',
-    name: '基础入门 48 色',
-    description: '适合新手，包含最常用的基础色',
-    // 取前 48 个颜色
-    colors: FULL_144_SET.slice(0, 48),
-  },
-  {
-    id: 'standard-72',
-    name: '标准进阶 72 色',
-    description: '标准配置，色彩覆盖更全面',
-    // 取前 72 个颜色
-    colors: FULL_144_SET.slice(0, 72),
-  },
-  {
-    id: 'expert-144',
-    name: '大师专业 144 色',
-    description: '全色系，色彩过渡细腻',
-    // 使用全部 144 个颜色
-    colors: FULL_144_SET.slice(0, 144),
-  },
-  {
-    id: 'grayscale',
-    name: '黑白灰专用 (12色)',
-    description: '用于制作黑白复古风格',
-    // 过滤出所有黑白灰的颜色
-    colors: FULL_144_SET.filter(c => 
-      c.name.includes('黑') || 
-      c.name.includes('白') || 
-      c.name.includes('灰') ||
-      c.id.startsWith('S') // 假设 S 系列是灰度
-    ),
-  }
+const PERLER_MASTER_COLORS: BeadColor[] = [
+  c('P01', 'White', '#F5F5F5'), // Perler 的白稍微暖一点
+  c('P02', 'Black', '#1A1A1A'),
+  c('P03', 'Yellow', '#FFD700'),
+  c('P04', 'Orange', '#FF8C00'),
+  c('P05', 'Red', '#DC143C'),
+  c('P06', 'Purple', '#8A2BE2'),
+  c('P07', 'Dark Blue', '#0000CD'),
+  c('P08', 'Light Blue', '#ADD8E6'),
+  c('P09', 'Dark Green', '#006400'),
+  c('P10', 'Light Green', '#90EE90'),
+  c('P11', 'Brown', '#8B4513'),
+  c('P12', 'Grey', '#808080'),
+  c('P13', 'Pink', '#FFB6C1'),
+  c('P14', 'Magenta', '#FF00FF'),
+  c('P15', 'Cheddar', '#FFA07A'),
+  c('P16', 'Toothpaste', '#00CED1'),
+  c('P17', 'Hot Coral', '#FF6347'),
+  c('P18', 'Plum', '#DDA0DD'),
+  c('P19', 'Kiwi Lime', '#ADFF2F'),
+  c('P20', 'Turquoise', '#40E0D0'),
 ];
 
-// 如果您有多套配置（例如不同品牌的色号系统），可以再定义一组 presets
-// 并在 UI 中增加“品牌”选择器。目前为了简化，我们将其统一放在预设列表中。
+// 自动填充 Perler 剩余颜色
+for(let i=21; i<=60; i++) {
+   const base = PERLER_MASTER_COLORS[i % 20];
+   PERLER_MASTER_COLORS.push(c(`P${i}`, `${base.name} V2`, base.hex)); 
+}
+
+const PERLER_BRAND: Brand = {
+  id: 'perler_c',
+  name: 'Perler (经典系列)',
+  description: '美式经典品牌，颜色鲜艳，融合后质感较硬。',
+  colors: PERLER_MASTER_COLORS,
+  presets: [
+    {
+      id: 'pl-12',
+      name: '基础 12 色',
+      description: '核心基础色',
+      colors: PERLER_MASTER_COLORS.slice(0, 12),
+    },
+    {
+      id: 'pl-48',
+      name: '标准 48 色',
+      description: 'Perler 常用桶装配置',
+      colors: PERLER_MASTER_COLORS.slice(0, 48),
+    }
+  ]
+};
+
+// ==========================================
+// 品牌配置 3: 灰度专用 (通用)
+// ==========================================
+const GRAY_COLORS: BeadColor[] = [
+    c('G01', '极白', '#FFFFFF'),
+    c('G02', '亮灰', '#E0E0E0'),
+    c('G03', '浅灰', '#C0C0C0'),
+    c('G04', '中灰', '#A0A0A0'),
+    c('G05', '灰', '#808080'),
+    c('G06', '深灰', '#606060'),
+    c('G07', '炭灰', '#404040'),
+    c('G08', '极黑', '#000000'),
+];
+
+const MONO_BRAND: Brand = {
+    id: 'mono',
+    name: '灰度专用系列',
+    description: '仅包含黑白灰，用于复古照片风格',
+    colors: GRAY_COLORS,
+    presets: [{
+        id: 'mono-8',
+        name: '标准 8 阶灰度',
+        colors: GRAY_COLORS
+    }]
+};
+
+// ==========================================
+// 导出所有品牌配置
+// ==========================================
+
+export const BRANDS: Brand[] = [
+  ARTKAL_BRAND,
+  PERLER_BRAND,
+  MONO_BRAND
+];

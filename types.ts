@@ -6,17 +6,10 @@ export interface RGB {
 }
 
 export interface BeadColor {
-  id: string; // The display code (e.g., "P01")
+  id: string; // The display code (e.g., "S01", "P01")
   name: string;
   hex: string;
   rgb: RGB;
-}
-
-// Configuration types
-export interface BrandConfig {
-  id: string;
-  name: string;
-  colors: BeadColor[];
 }
 
 export interface PalettePreset {
@@ -24,6 +17,14 @@ export interface PalettePreset {
   name: string;
   description?: string;
   colors: BeadColor[]; // The specific subset of colors for this palette
+}
+
+export interface Brand {
+  id: string;
+  name: string;
+  description: string;
+  colors: BeadColor[]; // Master list of all colors for this brand
+  presets: PalettePreset[]; // Available sets (e.g., 24 colors, 72 colors)
 }
 
 export interface BeadPixel {
@@ -36,7 +37,8 @@ export interface BeadPixel {
 export interface ProjectSettings {
   width: number; // in beads
   height: number; // in beads
-  paletteId: string;
+  brandId: string; // Selected brand
+  paletteId: string; // Selected preset within the brand
   dither: boolean;
   showGrid: boolean;
   showNumbers: boolean;

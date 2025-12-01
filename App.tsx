@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { BeadPixel, ProjectSettings, ProcessingStatus } from './types';
-import { PALETTE_PRESETS } from './palettes';
+import { BRANDS } from './palettes';
 import { processImageToBeads } from './utils';
 import { GoogleGenAI } from "@google/genai";
 
@@ -13,10 +13,14 @@ export default function App() {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [gridData, setGridData] = useState<BeadPixel[][]>([]);
   const [status, setStatus] = useState<ProcessingStatus>('IDLE');
+  
+  // Initialize with the first brand and its first preset
+  const defaultBrand = BRANDS[0];
   const [settings, setSettings] = useState<ProjectSettings>({
     width: 50,
     height: 50,
-    paletteId: 'standard-72', // Matches id in PALETTE_PRESETS
+    brandId: defaultBrand.id,
+    paletteId: defaultBrand.presets[1].id, // Default to 72 colors if available
     dither: false,
     showGrid: true,
     showNumbers: true,
@@ -37,12 +41,16 @@ export default function App() {
   // Initialize GenAI
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
+  // Helpers to get current config objects
+  const currentBrand = BRANDS.find(b => b.id === settings.brandId) || BRANDS[0];
+  const currentPreset = currentBrand.presets.find(p => p.id === settings.paletteId) || currentBrand.presets[0];
+
   // Effects
   useEffect(() => {
     if (imageSrc) {
       processImage();
     }
-  }, [imageSrc, settings.width, settings.height, settings.paletteId, settings.dither]);
+  }, [imageSrc, settings.width, settings.height, settings.brandId, settings.paletteId, settings.dither]);
 
   useEffect(() => {
     drawCanvas();
@@ -72,12 +80,26 @@ export default function App() {
     }
   };
 
+  const handleBrandChange = (newBrandId: string) => {
+    const brand = BRANDS.find(b => b.id === newBrandId);
+    if (brand) {
+      // When brand changes, reset palette to the first available preset of that brand
+      // Prefer a 'standard' middle preset if available, else first
+      const defaultPreset = brand.presets.length > 1 ? brand.presets[1].id : brand.presets[0].id;
+      setSettings(prev => ({
+        ...prev,
+        brandId: newBrandId,
+        paletteId: defaultPreset
+      }));
+    }
+  };
+
   const processImage = async () => {
     if (!imageSrc) return;
     setStatus('PROCESSING');
     try {
-      const preset = PALETTE_PRESETS.find(p => p.id === settings.paletteId);
-      const selectedPalette = preset ? preset.colors : PALETTE_PRESETS[0].colors;
+      // Use the helper variables derived from state
+      const selectedPalette = currentPreset.colors;
       
       const data = await processImageToBeads(
         imageSrc, 
@@ -191,13 +213,11 @@ export default function App() {
     const canvas = canvasRef.current;
     if (canvas) {
       const link = document.createElement('a');
-      link.download = `拼豆图纸-${settings.width}x${settings.height}.png`;
+      link.download = `拼豆图纸-${currentBrand.name}-${settings.width}x${settings.height}.png`;
       link.href = canvas.toDataURL();
       link.click();
     }
   };
-
-  const currentPreset = PALETTE_PRESETS.find(p => p.id === settings.paletteId);
 
   // UI Components
   return (
@@ -260,15 +280,30 @@ export default function App() {
               </div>
             </div>
 
-            {/* Palette Selection */}
+            {/* Brand Selection (NEW) */}
             <div>
-              <label className="block text-xs text-slate-400 mb-1">色卡方案 (自动匹配相近色)</label>
+              <label className="block text-xs text-slate-400 mb-1">拼豆品牌</label>
+              <select 
+                value={settings.brandId}
+                onChange={(e) => handleBrandChange(e.target.value)}
+                className="w-full bg-dark border border-slate-600 rounded px-3 py-2 text-sm focus:border-primary outline-none mb-1"
+              >
+                {BRANDS.map(b => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+               <p className="text-xs text-slate-500 italic">{currentBrand.description}</p>
+            </div>
+
+            {/* Palette Selection (Filtered by Brand) */}
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">色彩套装</label>
               <select 
                 value={settings.paletteId}
                 onChange={(e) => setSettings(s => ({ ...s, paletteId: e.target.value }))}
                 className="w-full bg-dark border border-slate-600 rounded px-3 py-2 text-sm focus:border-primary outline-none"
               >
-                {PALETTE_PRESETS.map(p => (
+                {currentBrand.presets.map(p => (
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
@@ -340,7 +375,7 @@ export default function App() {
                 {Array.from(colorCounts.entries())
                   .sort((a, b) => b[1] - a[1]) // Sort by count desc
                   .map(([id, count]) => {
-                    // Find color in current preset first, fallback to generic if weird
+                    // Find color in current preset first
                     const color = currentPreset.colors.find(c => c.id === id);
                     if (!color) return null;
                     return (
@@ -348,7 +383,7 @@ export default function App() {
                         <div className="flex items-center space-x-2">
                           <div className="w-3 h-3 rounded-full border border-slate-600" style={{ backgroundColor: color.hex }}></div>
                           <span className="font-mono text-slate-300 w-8">{id}</span>
-                          <span className="text-slate-400 truncate w-20">{color.name}</span>
+                          <span className="text-slate-400 truncate w-20" title={color.name}>{color.name}</span>
                         </div>
                         <span className="font-bold text-slate-200">{count} 颗</span>
                       </div>
