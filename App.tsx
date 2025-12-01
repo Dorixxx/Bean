@@ -14,13 +14,14 @@ export default function App() {
   const [gridData, setGridData] = useState<BeadPixel[][]>([]);
   const [status, setStatus] = useState<ProcessingStatus>('IDLE');
   
-  // Initialize with the first brand and its first preset
+  // Initialize with the first brand
   const defaultBrand = BRANDS[0];
   const [settings, setSettings] = useState<ProjectSettings>({
     width: 50,
     height: 50,
     brandId: defaultBrand.id,
-    paletteId: defaultBrand.presets[1].id, // Default to 72 colors if available
+    // Default to the last preset (usually the largest set) for better initial results
+    paletteId: defaultBrand.presets[defaultBrand.presets.length - 1].id,
     dither: false,
     showGrid: true,
     showNumbers: true,
@@ -83,13 +84,12 @@ export default function App() {
   const handleBrandChange = (newBrandId: string) => {
     const brand = BRANDS.find(b => b.id === newBrandId);
     if (brand) {
-      // When brand changes, reset palette to the first available preset of that brand
-      // Prefer a 'standard' middle preset if available, else first
-      const defaultPreset = brand.presets.length > 1 ? brand.presets[1].id : brand.presets[0].id;
+      // When switching brand, try to pick the largest preset by default to show full potential
+      const largestPreset = brand.presets[brand.presets.length - 1];
       setSettings(prev => ({
         ...prev,
         brandId: newBrandId,
-        paletteId: defaultPreset
+        paletteId: largestPreset.id
       }));
     }
   };
@@ -304,7 +304,7 @@ export default function App() {
                 className="w-full bg-dark border border-slate-600 rounded px-3 py-2 text-sm focus:border-primary outline-none"
               >
                 {currentBrand.presets.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
+                  <option key={p.id} value={p.id}>{p.name} ({p.colors.length}色)</option>
                 ))}
               </select>
               {currentPreset && (
