@@ -209,14 +209,107 @@ export default function App() {
 
   }, [gridData, settings, zoom]);
 
+  // 高清导出逻辑
   const handleDownload = () => {
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const link = document.createElement('a');
-      link.download = `拼豆图纸-${currentBrand.name}-${settings.width}x${settings.height}.png`;
-      link.href = canvas.toDataURL();
-      link.click();
+    if (gridData.length === 0) return;
+
+    // 1. 创建高分辨率 Canvas 用于导出
+    const EXPORT_CELL_SIZE = 40; // 每个珠子 40px，确保文字清晰
+    const PADDING = 40; // 边距
+    
+    const width = settings.width * EXPORT_CELL_SIZE + PADDING * 2;
+    const height = settings.height * EXPORT_CELL_SIZE + PADDING * 2;
+    
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // 2. 绘制背景 (白色，适合打印)
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, width, height);
+
+    // 3. 绘制标题信息
+    ctx.fillStyle = '#64748b'; // Slate 500
+    ctx.font = 'bold 20px sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`拼豆图纸 - ${currentBrand.name} - ${settings.width}x${settings.height}`, PADDING, PADDING - 10);
+    
+    ctx.textAlign = 'right';
+    ctx.fillText('PixelBead Master', width - PADDING, PADDING - 10);
+
+    ctx.translate(PADDING, PADDING);
+
+    // 4. 绘制网格
+    if (settings.showGrid) {
+        ctx.strokeStyle = '#e2e8f0'; // 浅灰色网格 Slate 200
+        ctx.lineWidth = 2; // 导出时网格线稍粗
+        
+        // 竖线
+        for (let i = 0; i <= settings.width; i++) {
+            ctx.beginPath();
+            ctx.moveTo(i * EXPORT_CELL_SIZE, 0);
+            ctx.lineTo(i * EXPORT_CELL_SIZE, settings.height * EXPORT_CELL_SIZE);
+            ctx.stroke();
+        }
+        
+        // 横线
+        for (let i = 0; i <= settings.height; i++) {
+            ctx.beginPath();
+            ctx.moveTo(0, i * EXPORT_CELL_SIZE);
+            ctx.lineTo(settings.width * EXPORT_CELL_SIZE, i * EXPORT_CELL_SIZE);
+            ctx.stroke();
+        }
     }
+
+    // 5. 绘制珠子
+    gridData.forEach((row, y) => {
+        row.forEach((bead, x) => {
+            const cx = x * EXPORT_CELL_SIZE + EXPORT_CELL_SIZE / 2;
+            const cy = y * EXPORT_CELL_SIZE + EXPORT_CELL_SIZE / 2;
+            const radius = (EXPORT_CELL_SIZE / 2) * 0.9; // 留出一点缝隙显示网格
+
+            ctx.fillStyle = bead.color.hex;
+            ctx.beginPath();
+            if (settings.pixelShape === 'circle') {
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+            } else {
+                const pad = EXPORT_CELL_SIZE * 0.05;
+                ctx.rect(
+                    x * EXPORT_CELL_SIZE + pad, 
+                    y * EXPORT_CELL_SIZE + pad, 
+                    EXPORT_CELL_SIZE - pad * 2, 
+                    EXPORT_CELL_SIZE - pad * 2
+                );
+            }
+            ctx.fill();
+
+            // 6. 绘制编号 (导出时总是绘制编号，除非用户特意关闭，但通常图纸都需要编号)
+            // 只要 showNumbers 为 true，就用大字体清晰绘制
+            if (settings.showNumbers) {
+                const rgb = bead.color.rgb;
+                // 计算亮度以决定文字颜色 (黑/白)
+                const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
+                const textColor = brightness > 128 ? '#000000' : '#FFFFFF';
+                
+                ctx.fillStyle = textColor;
+                // 使用粗体大字号
+                ctx.font = `bold ${Math.floor(EXPORT_CELL_SIZE * 0.4)}px Arial, sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                ctx.fillText(bead.color.id, cx, cy);
+            }
+        });
+    });
+
+    // 7. 触发下载
+    const link = document.createElement('a');
+    link.download = `拼豆图纸-${settings.width}x${settings.height}-${Date.now()}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
   };
 
   // UI Components
@@ -402,7 +495,7 @@ export default function App() {
             disabled={!imageSrc}
             className="w-full bg-primary hover:bg-secondary text-white py-3 rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            导出图纸 (PNG)
+            导出高清图纸 (PNG)
           </button>
         </div>
       </div>
