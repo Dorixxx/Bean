@@ -30,8 +30,8 @@ export interface Brand {
 export interface BeadPixel {
   x: number;
   y: number;
-  colorId: string;
-  color: BeadColor;
+  colorId: string | null; // null means no bead (background)
+  color: BeadColor | null;
 }
 
 export interface ProjectSettings {
@@ -43,6 +43,7 @@ export interface ProjectSettings {
   showGrid: boolean;
   showNumbers: boolean;
   pixelShape: 'circle' | 'square';
+  removeBackground: boolean; // New setting
 }
 
 export type ProcessingStatus = 'IDLE' | 'PROCESSING' | 'DONE';

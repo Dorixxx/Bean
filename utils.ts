@@ -31,7 +31,8 @@ export function processImageToBeads(
   width: number,
   height: number,
   palette: BeadColor[],
-  dither: boolean
+  dither: boolean,
+  removeBackground: boolean
 ): Promise<BeadPixel[][]> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -47,9 +48,10 @@ export function processImageToBeads(
         return;
       }
 
+      // Clear with transparent black first
+      ctx.clearRect(0, 0, width, height);
+      
       // Draw and resize image
-      // Using simple resize. For better results, one might use a step-down resize
-      // but canvas drawImage is usually sufficient for pixel art preview.
       ctx.drawImage(img, 0, 0, width, height);
       const imgData = ctx.getImageData(0, 0, width, height);
       const data = imgData.data;
@@ -61,6 +63,24 @@ export function processImageToBeads(
         grid[y] = [];
       }
 
+      // Background Detection Logic
+      // If removeBackground is enabled, we assume the top-left pixel represents the background color
+      // if the image has a solid background.
+      let bgR = 0, bgG = 0, bgB = 0, bgA = 0;
+      let hasSolidBackground = false;
+
+      if (removeBackground) {
+        // Sample pixel at (0,0)
+        bgR = data[0];
+        bgG = data[1];
+        bgB = data[2];
+        bgA = data[3];
+        // Only consider it a solid color background if it's somewhat visible
+        if (bgA > 50) {
+            hasSolidBackground = true;
+        }
+      }
+
       // Process pixels
       for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
@@ -70,9 +90,40 @@ export function processImageToBeads(
           const b = data[idx + 2];
           const a = data[idx + 3];
 
-          // If fully transparent, default to white or skip? 
-          // Current logic maps transparent to closest color (usually white/black)
-          // To improve: handle alpha. For now, we blend with white background if alpha < 255
+          let isBackground = false;
+          
+          // 1. Transparency check
+          if (a < 50) {
+            isBackground = true;
+          } 
+          // 2. Solid color background removal
+          else if (removeBackground && hasSolidBackground) {
+             // Calculate distance to the detected background color
+             // We use non-squared Euclidean distance here for a simple threshold
+             const dist = Math.sqrt(
+                Math.pow(r - bgR, 2) + 
+                Math.pow(g - bgG, 2) + 
+                Math.pow(b - bgB, 2)
+             );
+             
+             // Tolerance of 25 covers JPEG artifacts and minor variations
+             if (dist < 25) {
+                isBackground = true;
+             }
+          }
+
+          if (isBackground) {
+             grid[y][x] = {
+               x,
+               y,
+               colorId: null,
+               color: null,
+             };
+             continue;
+          }
+
+          // Blend with white if semi-transparent (simulating white pegboard)
+          // unless alpha is very low (handled above)
           const alpha = a / 255;
           const blendedR = r * alpha + 255 * (1 - alpha);
           const blendedG = g * alpha + 255 * (1 - alpha);
@@ -81,7 +132,7 @@ export function processImageToBeads(
           const currentPixel: RGB = { r: blendedR, g: blendedG, b: blendedB };
           const closest = findClosestColor(currentPixel, palette);
 
-          // Simple Floyd-Steinberg Dithering
+          // Floyd-Steinberg Dithering
           if (dither) {
             const errR = blendedR - closest.rgb.r;
             const errG = blendedG - closest.rgb.g;
@@ -90,11 +141,12 @@ export function processImageToBeads(
             const distributeError = (dx: number, dy: number, factor: number) => {
               if (x + dx >= 0 && x + dx < width && y + dy >= 0 && y + dy < height) {
                 const nIdx = ((y + dy) * width + (x + dx)) * 4;
-                // Note: Modifying the buffer directly affects subsequent pixels
-                // We ignore alpha for error diffusion simplicity here
-                data[nIdx] = Math.min(255, Math.max(0, data[nIdx] + errR * factor));
-                data[nIdx + 1] = Math.min(255, Math.max(0, data[nIdx + 1] + errG * factor));
-                data[nIdx + 2] = Math.min(255, Math.max(0, data[nIdx + 2] + errB * factor));
+                // Only distribute error to non-transparent pixels
+                if (data[nIdx + 3] > 50) {
+                    data[nIdx] = Math.min(255, Math.max(0, data[nIdx] + errR * factor));
+                    data[nIdx + 1] = Math.min(255, Math.max(0, data[nIdx + 1] + errG * factor));
+                    data[nIdx + 2] = Math.min(255, Math.max(0, data[nIdx + 2] + errB * factor));
+                }
               }
             };
 

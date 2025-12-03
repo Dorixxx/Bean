@@ -26,6 +26,7 @@ export default function App() {
     showGrid: true,
     showNumbers: true,
     pixelShape: 'square',
+    removeBackground: true, // Default to true for better initial experience
   });
   
   // For aspect ratio maintenance
@@ -51,7 +52,7 @@ export default function App() {
     if (imageSrc) {
       processImage();
     }
-  }, [imageSrc, settings.width, settings.height, settings.brandId, settings.paletteId, settings.dither]);
+  }, [imageSrc, settings.width, settings.height, settings.brandId, settings.paletteId, settings.dither, settings.removeBackground]);
 
   useEffect(() => {
     drawCanvas();
@@ -106,7 +107,8 @@ export default function App() {
         settings.width, 
         settings.height, 
         selectedPalette, 
-        settings.dither
+        settings.dither,
+        settings.removeBackground
       );
       setGridData(data);
       setStatus('DONE');
@@ -119,10 +121,20 @@ export default function App() {
   const countColors = useCallback(() => {
     const counts = new Map<string, number>();
     gridData.flat().forEach(bead => {
-      counts.set(bead.color.id, (counts.get(bead.color.id) || 0) + 1);
+      if (bead.color && bead.colorId) {
+        counts.set(bead.colorId, (counts.get(bead.colorId) || 0) + 1);
+      }
     });
     setColorCounts(counts);
   }, [gridData]);
+
+  const getContrastColor = (hex: string) => {
+    const r = parseInt(hex.substr(1, 2), 16);
+    const g = parseInt(hex.substr(3, 2), 16);
+    const b = parseInt(hex.substr(5, 2), 16);
+    const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+    return (yiq >= 128) ? '#000000' : '#FFFFFF';
+  };
 
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -174,6 +186,8 @@ export default function App() {
     // Draw beads
     gridData.forEach((row, y) => {
       row.forEach((bead, x) => {
+        if (!bead.color || !bead.colorId) return; // Skip background/empty pixels
+
         const cx = x * beadSize + beadSize / 2;
         const cy = y * beadSize + beadSize / 2;
         const radius = (beadSize / 2) * 0.85; // slightly smaller than cell
@@ -193,16 +207,11 @@ export default function App() {
 
         // Draw numbers if enabled
         if (settings.showNumbers && zoom > 0.6) {
-           // Decide text color based on bead brightness
-           const rgb = bead.color.rgb;
-           // Perceived brightness formula
-           const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
-           ctx.fillStyle = brightness > 125 ? '#000000' : '#FFFFFF';
-           
+           ctx.fillStyle = getContrastColor(bead.color.hex);
            ctx.font = `bold ${Math.max(8, beadSize * 0.35)}px sans-serif`;
            ctx.textAlign = 'center';
            ctx.textBaseline = 'middle';
-           ctx.fillText(bead.color.id, cx, cy);
+           ctx.fillText(bead.colorId, cx, cy);
         }
       });
     });
@@ -213,39 +222,76 @@ export default function App() {
   const handleDownload = () => {
     if (gridData.length === 0) return;
 
-    // 1. 创建高分辨率 Canvas 用于导出
-    const EXPORT_CELL_SIZE = 40; // 每个珠子 40px，确保文字清晰
-    const PADDING = 40; // 边距
+    const EXPORT_CELL_SIZE = 40; 
+    const PADDING = 40; 
+    const LEGEND_BOX_HEIGHT = 50; // Taller boxes
     
-    const width = settings.width * EXPORT_CELL_SIZE + PADDING * 2;
-    const height = settings.height * EXPORT_CELL_SIZE + PADDING * 2;
+    // 准备颜色清单数据
+    const usedColors = Array.from(colorCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([id, count]) => {
+            const color = currentPreset.colors.find(c => c.id === id);
+            return { id, count, color };
+        })
+        .filter(item => item.color) as { id: string, count: number, color: BeadPixel['color'] }[];
+    
+    // 计算布局
+    let canvasWidth = settings.width * EXPORT_CELL_SIZE + PADDING * 2;
+    canvasWidth = Math.max(canvasWidth, 1000); // 最小宽度1000确保图例清晰
+
+    const gridHeight = settings.height * EXPORT_CELL_SIZE;
+    
+    // 图例布局：颜色块背景充满
+    const availableWidth = canvasWidth - PADDING * 2;
+    const colGap = 15;
+    const rowGap = 15;
+    
+    // 每列宽度
+    const minColWidth = 250;
+    const columns = Math.max(2, Math.floor(availableWidth / minColWidth)); 
+    const boxWidth = (availableWidth - (columns - 1) * colGap) / columns;
+    const rows = Math.ceil(usedColors.length / columns);
+    
+    const legendHeaderHeight = 60;
+    const legendBodyHeight = usedColors.length > 0 ? (rows * (LEGEND_BOX_HEIGHT + rowGap)) : 0;
+    const legendTotalHeight = usedColors.length > 0 ? (legendHeaderHeight + legendBodyHeight + 40) : 0;
+
+    const canvasHeight = gridHeight + PADDING * 2 + legendTotalHeight;
     
     const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // 2. 绘制背景 (白色，适合打印)
+    // 2. 绘制背景 (白色)
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, width, height);
+    ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-    // 3. 绘制标题信息
-    ctx.fillStyle = '#64748b'; // Slate 500
-    ctx.font = 'bold 20px sans-serif';
+    // 3. 绘制顶部标题信息
+    ctx.fillStyle = '#000000'; 
+    ctx.font = 'bold 28px sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(`拼豆图纸 - ${currentBrand.name} - ${settings.width}x${settings.height}`, PADDING, PADDING - 10);
+    ctx.fillText(`拼豆图纸 - ${currentBrand.name}`, PADDING, PADDING - 15);
     
     ctx.textAlign = 'right';
-    ctx.fillText('PixelBead Master', width - PADDING, PADDING - 10);
+    ctx.font = '20px sans-serif';
+    ctx.fillText(`${settings.width}x${settings.height} | PixelBead Master`, canvasWidth - PADDING, PADDING - 15);
 
-    ctx.translate(PADDING, PADDING);
+    // 保存状态
+    ctx.save();
+    
+    // 居中绘制网格
+    const gridDrawX = (canvasWidth - settings.width * EXPORT_CELL_SIZE) / 2;
+    const gridDrawY = PADDING;
+    
+    ctx.translate(gridDrawX, gridDrawY);
 
-    // 4. 绘制网格
+    // 4. 绘制网格 (黑色)
     if (settings.showGrid) {
-        ctx.strokeStyle = '#e2e8f0'; // 浅灰色网格 Slate 200
-        ctx.lineWidth = 2; // 导出时网格线稍粗
+        ctx.strokeStyle = '#000000'; 
+        ctx.lineWidth = 1;
         
         // 竖线
         for (let i = 0; i <= settings.width; i++) {
@@ -267,9 +313,11 @@ export default function App() {
     // 5. 绘制珠子
     gridData.forEach((row, y) => {
         row.forEach((bead, x) => {
+            if (!bead.color || !bead.colorId) return; // Skip empty beads
+
             const cx = x * EXPORT_CELL_SIZE + EXPORT_CELL_SIZE / 2;
             const cy = y * EXPORT_CELL_SIZE + EXPORT_CELL_SIZE / 2;
-            const radius = (EXPORT_CELL_SIZE / 2) * 0.9; // 留出一点缝隙显示网格
+            const radius = (EXPORT_CELL_SIZE / 2) * 0.85;
 
             ctx.fillStyle = bead.color.hex;
             ctx.beginPath();
@@ -285,27 +333,114 @@ export default function App() {
                 );
             }
             ctx.fill();
-
-            // 6. 绘制编号 (导出时总是绘制编号，除非用户特意关闭，但通常图纸都需要编号)
-            // 只要 showNumbers 为 true，就用大字体清晰绘制
+            
+            // 6. 绘制编号 (仅在有珠子的地方)
             if (settings.showNumbers) {
-                const rgb = bead.color.rgb;
-                // 计算亮度以决定文字颜色 (黑/白)
-                const brightness = (rgb.r * 299 + rgb.g * 587 + rgb.b * 114) / 1000;
-                const textColor = brightness > 128 ? '#000000' : '#FFFFFF';
-                
+                const textColor = getContrastColor(bead.color.hex);
                 ctx.fillStyle = textColor;
-                // 使用粗体大字号
-                ctx.font = `bold ${Math.floor(EXPORT_CELL_SIZE * 0.4)}px Arial, sans-serif`;
+                ctx.font = `bold ${Math.floor(EXPORT_CELL_SIZE * 0.35)}px Arial, sans-serif`;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
-                
-                ctx.fillText(bead.color.id, cx, cy);
+                ctx.fillText(bead.colorId, cx, cy);
             }
         });
     });
 
-    // 7. 触发下载
+    // 绘制外边框 (黑色，加粗)
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(0, 0, settings.width * EXPORT_CELL_SIZE, settings.height * EXPORT_CELL_SIZE);
+
+    ctx.restore();
+
+    // 7. 绘制底部颜色清单 (New Design: Colored Backgrounds)
+    if (usedColors.length > 0) {
+        const legendStartY = gridDrawY + gridHeight + 50;
+        
+        // 分割线
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(PADDING, legendStartY);
+        ctx.lineTo(canvasWidth - PADDING, legendStartY);
+        ctx.stroke();
+
+        // 标题
+        ctx.fillStyle = '#000000';
+        ctx.font = 'bold 24px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText('材料清单 / Color List', PADDING, legendStartY + 15);
+        
+        const totalBeads = usedColors.reduce((sum, item) => sum + item.count, 0);
+        ctx.textAlign = 'right';
+        ctx.fillText(`总数 Total: ${totalBeads}`, canvasWidth - PADDING, legendStartY + 15);
+
+        // 列表内容
+        const listStartY = legendStartY + 60;
+        
+        usedColors.forEach((item, index) => {
+            if (!item.color) return;
+            const col = index % columns;
+            const row = Math.floor(index / columns);
+            
+            const x = PADDING + col * (boxWidth + colGap);
+            const y = listStartY + row * (LEGEND_BOX_HEIGHT + rowGap);
+            
+            // 1. 绘制背景实心矩形 (Bead Color)
+            ctx.fillStyle = item.color.hex;
+            ctx.fillRect(x, y, boxWidth, LEGEND_BOX_HEIGHT);
+            
+            // 2. 绘制边框 (Black)
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(x, y, boxWidth, LEGEND_BOX_HEIGHT);
+            
+            // 3. 确定文字颜色 (High Contrast)
+            const textColor = getContrastColor(item.color.hex);
+            ctx.fillStyle = textColor;
+            
+            // 4. 绘制文字内容
+            // 布局: [ID] [Name] ...... [Count]
+            const paddingX = 15;
+            const centerY = y + LEGEND_BOX_HEIGHT / 2;
+
+            // ID (Bold Monospace)
+            ctx.font = 'bold 22px monospace';
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(item.id, x + paddingX, centerY);
+            
+            // Count (Right aligned, Bold)
+            ctx.font = 'bold 22px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText(`x${item.count}`, x + boxWidth - paddingX, centerY);
+
+            // Name (Centered between ID and Count)
+            const idWidth = ctx.measureText(item.id).width;
+            const countWidth = ctx.measureText(`x${item.count}`).width;
+            
+            const nameStart = x + paddingX + idWidth + 20; 
+            const nameEnd = x + boxWidth - paddingX - countWidth - 20;
+            const maxNameWidth = nameEnd - nameStart;
+            
+            if (maxNameWidth > 0) {
+                ctx.font = 'bold 18px sans-serif';
+                ctx.textAlign = 'left';
+                let name = item.color.name;
+                // Measure and truncate
+                if (ctx.measureText(name).width > maxNameWidth) {
+                   while (name.length > 0 && ctx.measureText(name + '..').width > maxNameWidth) {
+                       name = name.slice(0, -1);
+                   }
+                   name += '..';
+                }
+                ctx.fillText(name, nameStart, centerY);
+            }
+        });
+    }
+
+    // 8. 触发下载
     const link = document.createElement('a');
     link.download = `拼豆图纸-${settings.width}x${settings.height}-${Date.now()}.png`;
     link.href = canvas.toDataURL('image/png');
@@ -373,7 +508,7 @@ export default function App() {
               </div>
             </div>
 
-            {/* Brand Selection (NEW) */}
+            {/* Brand Selection */}
             <div>
               <label className="block text-xs text-slate-400 mb-1">拼豆品牌</label>
               <select 
@@ -388,7 +523,7 @@ export default function App() {
                <p className="text-xs text-slate-500 italic">{currentBrand.description}</p>
             </div>
 
-            {/* Palette Selection (Filtered by Brand) */}
+            {/* Palette Selection */}
             <div>
               <label className="block text-xs text-slate-400 mb-1">色彩套装</label>
               <select 
@@ -426,6 +561,16 @@ export default function App() {
 
             {/* Toggles */}
             <div className="space-y-2 pt-2">
+              <label className="flex items-center space-x-2 cursor-pointer" title="自动去除透明背景或纯色背景">
+                <input 
+                  type="checkbox" 
+                  checked={settings.removeBackground}
+                  onChange={(e) => setSettings(s => ({ ...s, removeBackground: e.target.checked }))}
+                  className="form-checkbox text-primary rounded bg-dark border-slate-600"
+                />
+                <span className="text-sm text-yellow-300">提取主体 (去除背景)</span>
+              </label>
+
               <label className="flex items-center space-x-2 cursor-pointer">
                 <input 
                   type="checkbox" 
@@ -468,7 +613,6 @@ export default function App() {
                 {Array.from(colorCounts.entries())
                   .sort((a, b) => b[1] - a[1]) // Sort by count desc
                   .map(([id, count]) => {
-                    // Find color in current preset first
                     const color = currentPreset.colors.find(c => c.id === id);
                     if (!color) return null;
                     return (
@@ -484,7 +628,10 @@ export default function App() {
                   })}
                 <div className="pt-2 border-t border-slate-700 flex justify-between font-bold">
                   <span>总计珠子数</span>
-                  <span>{gridData.length * gridData[0].length}</span>
+                  <span>
+                    {/* Only count beads that are not null */}
+                    {gridData.flat().filter(b => b.color !== null).length}
+                  </span>
                 </div>
               </div>
             </div>
