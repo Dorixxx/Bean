@@ -1,187 +1,177 @@
 
-import { BeadColor, PalettePreset, RGB, Brand } from './types';
+import { BeadColor, Brand } from './types';
+import { MARD_COLORS_MAP, MARD_BOXES, MARD_COLORS_LIST, c } from './bead_database';
 
 // ==========================================
-// 辅助函数
+// 辅助工具函数
 // ==========================================
-function hexToRgb(hex: string): RGB {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result
-    ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16),
-      }
-    : { r: 0, g: 0, b: 0 };
+
+// 将颜色 ID 列表转换为 BeadColor 对象列表，自动过滤无效 ID
+function idsToColors(ids: string[]): BeadColor[] {
+    const colors: BeadColor[] = [];
+    const seen = new Set<string>();
+    
+    ids.forEach(id => {
+        if (!seen.has(id)) {
+            const color = MARD_COLORS_MAP.get(id);
+            if (color) {
+                colors.push(color);
+                seen.add(id);
+            } else {
+                console.warn(`Color ID not found: ${id}`);
+            }
+        }
+    });
+    return colors;
 }
 
-const c = (id: string, name: string, hex: string): BeadColor => ({
-  id,
-  name,
-  hex,
-  rgb: hexToRgb(hex),
-});
+// 合并多个 ID 列表
+function mergeIds(...boxKeys: string[]): string[] {
+    const merged: string[] = [];
+    boxKeys.forEach(key => {
+        if (MARD_BOXES[key]) {
+            merged.push(...MARD_BOXES[key]);
+        }
+    });
+    return merged;
+}
 
-// ==========================================
-// 品牌配置 1: Artkal (S系列硬豆)
-// 这是一个偏向专业、色彩丰富的品牌
-// ==========================================
+// ==================================================================================
+// Mard 品牌套装配置
+// ==================================================================================
 
-const ARTKAL_MASTER_COLORS: BeadColor[] = [
-  c('S01', '白色', '#FFFFFF'),
-  c('S02', '黑色', '#000000'),
-  c('S03', '浅灰', '#C0C0C0'),
-  c('S04', '深灰', '#808080'),
-  c('S05', '大红', '#FF0000'),
-  c('S06', '玫瑰红', '#FF007F'),
-  c('S07', '粉红', '#FFC0CB'),
-  c('S08', '橙色', '#FFA500'),
-  c('S09', '黄色', '#FFFF00'),
-  c('S10', '浅黄', '#FFFFE0'),
-  c('S11', '绿色', '#008000'),
-  c('S12', '嫩绿', '#90EE90'),
-  c('S13', '天蓝', '#87CEEB'),
-  c('S14', '深蓝', '#00008B'),
-  c('S15', '紫色', '#800080'),
-  c('S16', '浅紫', '#DDA0DD'),
-  c('S17', '棕色', '#A52A2A'),
-  c('S18', '肉色', '#FFDAB9'),
-  c('S19', '透明', '#F0F8FF'),
-  c('S20', '荧光绿', '#00FF00'),
-  c('S21', '荧光橙', '#FF4500'),
-  c('S22', '荧光粉', '#FF69B4'),
-  c('S23', '奶油', '#FFFDD0'),
-  c('S24', '薄荷', '#98FB98'),
-  // 模拟扩展到 72 色 (此处为代码简洁省略部分，实际配置可写满)
-  c('S25', '薰衣草', '#E6E6FA'),
-  c('S26', '海军蓝', '#000080'),
-  c('S27', '蓝绿', '#008080'),
-  c('S28', '橄榄', '#808000'),
-  c('S29', '紫红', '#C71585'),
-  c('S30', '赭石', '#A0522D'),
+// 24色: Box 1
+const PRESET_24 = idsToColors(MARD_BOXES['BOX_1']);
+
+// 48色: 1 + 2
+const PRESET_48 = idsToColors(mergeIds('BOX_1', 'BOX_2'));
+
+// 72色: 1 + 2 + 3
+const PRESET_72 = idsToColors(mergeIds('BOX_1', 'BOX_2', 'BOX_3'));
+
+// 96色: 1 + 2 + 3 + 4
+const PRESET_96 = idsToColors(mergeIds('BOX_1', 'BOX_2', 'BOX_3', 'BOX_4'));
+
+// 120色: A + B + C + D + E
+const PRESET_120_IDS = mergeIds('BOX_A', 'BOX_B', 'BOX_C', 'BOX_D', 'BOX_E');
+const PRESET_120 = idsToColors(PRESET_120_IDS);
+
+// 144色: 120 + 6
+const PRESET_144 = idsToColors([...PRESET_120_IDS, ...MARD_BOXES['BOX_6']]);
+
+// 216色: 120 + 6 + 9 + 10 + 11 (并排除特定颜色)
+// 排除: C29, D10, B9, C12, D4
+const EXCLUDE_216 = new Set(['C29', 'D10', 'B9', 'C12', 'D4']);
+const PRESET_216_RAW = [
+    ...PRESET_120_IDS, 
+    ...MARD_BOXES['BOX_6'], 
+    ...MARD_BOXES['BOX_9'], 
+    ...MARD_BOXES['BOX_10'], 
+    ...MARD_BOXES['BOX_11']
 ];
+const PRESET_216 = idsToColors(PRESET_216_RAW.filter(id => !EXCLUDE_216.has(id)));
 
-// 自动填充 Artkal 剩余颜色以模拟大数据集
-for(let i=31; i<=144; i++) {
-   const base = ARTKAL_MASTER_COLORS[i % 30];
-   ARTKAL_MASTER_COLORS.push(c(`S${i}`, `${base.name}-变体`, base.hex)); 
-   // 在真实场景中，这里应手动配置真实的 Hex
-}
+// 264色: 120 + 6 + 7 + 8 + 9 + 10 + 11 (并排除 C29)
+const EXCLUDE_264 = new Set(['C29']);
+const PRESET_264_RAW = [
+    ...PRESET_120_IDS,
+    ...MARD_BOXES['BOX_6'],
+    ...MARD_BOXES['BOX_7'],
+    ...MARD_BOXES['BOX_8'],
+    ...MARD_BOXES['BOX_9'],
+    ...MARD_BOXES['BOX_10'],
+    ...MARD_BOXES['BOX_11']
+];
+const PRESET_264 = idsToColors(PRESET_264_RAW.filter(id => !EXCLUDE_264.has(id)));
 
+
+export const MARD_BRAND: Brand = {
+    id: 'mard',
+    name: 'Mard (官方套装配置)',
+    description: '官方295色全集，支持24/48/72/144等标准套装切换。',
+    colors: MARD_COLORS_LIST, // 品牌全集
+    presets: [
+        {
+            id: 'mard-24',
+            name: '基础 24 色',
+            description: 'Box 1',
+            colors: PRESET_24
+        },
+        {
+            id: 'mard-48',
+            name: '进阶 48 色',
+            description: 'Box 1+2',
+            colors: PRESET_48
+        },
+        {
+            id: 'mard-72',
+            name: '高级 72 色',
+            description: 'Box 1+2+3',
+            colors: PRESET_72
+        },
+        {
+            id: 'mard-96',
+            name: '专业 96 色',
+            description: 'Box 1+2+3+4',
+            colors: PRESET_96
+        },
+        {
+            id: 'mard-120',
+            name: '大师 120 色',
+            description: 'Box A+B+C+D+E',
+            colors: PRESET_120
+        },
+        {
+            id: 'mard-144',
+            name: '大师 144 色 (120+6号盒)',
+            description: 'Box A-E + Box 6',
+            colors: PRESET_144
+        },
+        {
+            id: 'mard-216',
+            name: '全实色 216 色',
+            description: '含9/10/11号补充盒 (排除部分重复/特殊色)',
+            colors: PRESET_216
+        },
+        {
+            id: 'mard-264',
+            name: '全色 264 色',
+            description: '含7/8号夜光/特殊盒 (排除C29)',
+            colors: PRESET_264
+        },
+        {
+            id: 'mard-full',
+            name: '图纸全集 (295色)',
+            description: '包含所有系列 A-ZG',
+            colors: MARD_COLORS_LIST
+        }
+    ]
+};
+
+// ==================================================================================
+// Artkal (示例品牌)
+// ==================================================================================
+
+const ARTKAL_BASE_COLORS: BeadColor[] = [
+  c('S01', '#FFFFFF', 'S-白色'), c('S02', '#000000', 'S-黑色'), c('S03', '#C0C0C0', 'S-浅灰'), c('S04', '#808080', 'S-深灰'),
+  c('S05', '#FF0000', 'S-大红'), c('S06', '#FF007F', 'S-玫红'), c('S07', '#FFC0CB', 'S-粉红'), c('S08', '#FFA500', 'S-橙色'),
+  c('S09', '#FFFF00', 'S-黄色'), c('S10', '#FFFFE0', 'S-浅黄'), c('S11', '#008000', 'S-绿色'), c('S12', '#90EE90', 'S-嫩绿'),
+];
 const ARTKAL_BRAND: Brand = {
   id: 'artkal_s',
-  name: 'Artkal (S系列硬豆)',
-  description: '色彩丰富，适合专业像素画，融合度高。',
-  colors: ARTKAL_MASTER_COLORS,
+  name: 'Artkal (S系列)',
+  description: '示例品牌，仅包含基础色。',
+  colors: ARTKAL_BASE_COLORS,
   presets: [
     {
-      id: 'ak-24',
-      name: '新手包 24 色',
-      description: '基础常用色',
-      colors: ARTKAL_MASTER_COLORS.slice(0, 24),
-    },
-    {
-      id: 'ak-72',
-      name: '进阶装 72 色',
-      description: '标准全色系，覆盖大部分需求',
-      colors: ARTKAL_MASTER_COLORS.slice(0, 72),
-    },
-    {
-      id: 'ak-144',
-      name: '大师级 144 色',
-      description: '极致色彩表现',
-      colors: ARTKAL_MASTER_COLORS.slice(0, 144),
+        id: 'ak-12',
+        name: '基础 12 色',
+        colors: ARTKAL_BASE_COLORS
     }
   ]
 };
-
-// ==========================================
-// 品牌配置 2: Perler (P系列)
-// 这是一个经典的美国品牌，色号系统完全不同
-// ==========================================
-
-const PERLER_MASTER_COLORS: BeadColor[] = [
-  c('P01', 'White', '#F5F5F5'), // Perler 的白稍微暖一点
-  c('P02', 'Black', '#1A1A1A'),
-  c('P03', 'Yellow', '#FFD700'),
-  c('P04', 'Orange', '#FF8C00'),
-  c('P05', 'Red', '#DC143C'),
-  c('P06', 'Purple', '#8A2BE2'),
-  c('P07', 'Dark Blue', '#0000CD'),
-  c('P08', 'Light Blue', '#ADD8E6'),
-  c('P09', 'Dark Green', '#006400'),
-  c('P10', 'Light Green', '#90EE90'),
-  c('P11', 'Brown', '#8B4513'),
-  c('P12', 'Grey', '#808080'),
-  c('P13', 'Pink', '#FFB6C1'),
-  c('P14', 'Magenta', '#FF00FF'),
-  c('P15', 'Cheddar', '#FFA07A'),
-  c('P16', 'Toothpaste', '#00CED1'),
-  c('P17', 'Hot Coral', '#FF6347'),
-  c('P18', 'Plum', '#DDA0DD'),
-  c('P19', 'Kiwi Lime', '#ADFF2F'),
-  c('P20', 'Turquoise', '#40E0D0'),
-];
-
-// 自动填充 Perler 剩余颜色
-for(let i=21; i<=60; i++) {
-   const base = PERLER_MASTER_COLORS[i % 20];
-   PERLER_MASTER_COLORS.push(c(`P${i}`, `${base.name} V2`, base.hex)); 
-}
-
-const PERLER_BRAND: Brand = {
-  id: 'perler_c',
-  name: 'Perler (经典系列)',
-  description: '美式经典品牌，颜色鲜艳，融合后质感较硬。',
-  colors: PERLER_MASTER_COLORS,
-  presets: [
-    {
-      id: 'pl-12',
-      name: '基础 12 色',
-      description: '核心基础色',
-      colors: PERLER_MASTER_COLORS.slice(0, 12),
-    },
-    {
-      id: 'pl-48',
-      name: '标准 48 色',
-      description: 'Perler 常用桶装配置',
-      colors: PERLER_MASTER_COLORS.slice(0, 48),
-    }
-  ]
-};
-
-// ==========================================
-// 品牌配置 3: 灰度专用 (通用)
-// ==========================================
-const GRAY_COLORS: BeadColor[] = [
-    c('G01', '极白', '#FFFFFF'),
-    c('G02', '亮灰', '#E0E0E0'),
-    c('G03', '浅灰', '#C0C0C0'),
-    c('G04', '中灰', '#A0A0A0'),
-    c('G05', '灰', '#808080'),
-    c('G06', '深灰', '#606060'),
-    c('G07', '炭灰', '#404040'),
-    c('G08', '极黑', '#000000'),
-];
-
-const MONO_BRAND: Brand = {
-    id: 'mono',
-    name: '灰度专用系列',
-    description: '仅包含黑白灰，用于复古照片风格',
-    colors: GRAY_COLORS,
-    presets: [{
-        id: 'mono-8',
-        name: '标准 8 阶灰度',
-        colors: GRAY_COLORS
-    }]
-};
-
-// ==========================================
-// 导出所有品牌配置
-// ==========================================
 
 export const BRANDS: Brand[] = [
-  ARTKAL_BRAND,
-  PERLER_BRAND,
-  MONO_BRAND
+  MARD_BRAND,
+  ARTKAL_BRAND
 ];
