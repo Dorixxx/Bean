@@ -14,6 +14,9 @@ export default function App() {
   const [gridData, setGridData] = useState<BeadPixel[][]>([]);
   const [status, setStatus] = useState<ProcessingStatus>('IDLE');
   
+  // New State for reference image
+  const [showReference, setShowReference] = useState(true);
+  
   // Initialize with the first brand
   const defaultBrand = BRANDS[0];
   const [settings, setSettings] = useState<ProjectSettings>({
@@ -224,7 +227,7 @@ export default function App() {
 
     const EXPORT_CELL_SIZE = 40; 
     const PADDING = 40; 
-    const LEGEND_BOX_HEIGHT = 50; // Taller boxes
+    const LEGEND_BOX_HEIGHT = 50; 
     
     // 准备颜色清单数据
     const usedColors = Array.from(colorCounts.entries())
@@ -247,7 +250,7 @@ export default function App() {
     const rowGap = 15;
     
     // 每列宽度
-    const minColWidth = 250;
+    const minColWidth = 220;
     const columns = Math.max(2, Math.floor(availableWidth / minColWidth)); 
     const boxWidth = (availableWidth - (columns - 1) * colGap) / columns;
     const rows = Math.ceil(usedColors.length / columns);
@@ -273,7 +276,10 @@ export default function App() {
     ctx.font = 'bold 28px sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(`拼豆图纸 - ${currentBrand.name}`, PADDING, PADDING - 15);
+    
+    // 标题包含品牌和套装名
+    const title = `拼豆图纸 - ${currentBrand.name} [${currentPreset.name}]`;
+    ctx.fillText(title, PADDING, PADDING - 15);
     
     ctx.textAlign = 'right';
     ctx.font = '20px sans-serif';
@@ -353,7 +359,7 @@ export default function App() {
 
     ctx.restore();
 
-    // 7. 绘制底部颜色清单 (New Design: Colored Backgrounds)
+    // 7. 绘制底部颜色清单 (New Design: Solid Color Background)
     if (usedColors.length > 0) {
         const legendStartY = gridDrawY + gridHeight + 50;
         
@@ -387,55 +393,55 @@ export default function App() {
             const x = PADDING + col * (boxWidth + colGap);
             const y = listStartY + row * (LEGEND_BOX_HEIGHT + rowGap);
             
-            // 1. 绘制背景实心矩形 (Bead Color)
+            // 1. 绘制背景实心矩形 (Bead Color) - 囊括整个框
             ctx.fillStyle = item.color.hex;
             ctx.fillRect(x, y, boxWidth, LEGEND_BOX_HEIGHT);
             
-            // 2. 绘制边框 (Black)
+            // 2. 绘制边框 (Black, Thin)
             ctx.strokeStyle = '#000000';
             ctx.lineWidth = 2;
             ctx.strokeRect(x, y, boxWidth, LEGEND_BOX_HEIGHT);
             
-            // 3. 确定文字颜色 (High Contrast)
+            // 3. 确定文字颜色 (High Contrast based on background)
             const textColor = getContrastColor(item.color.hex);
             ctx.fillStyle = textColor;
             
             // 4. 绘制文字内容
             // 布局: [ID] [Name] ...... [Count]
-            const paddingX = 15;
+            const paddingX = 10;
             const centerY = y + LEGEND_BOX_HEIGHT / 2;
 
             // ID (Bold Monospace)
-            ctx.font = 'bold 22px monospace';
+            ctx.font = 'bold 20px monospace';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
             ctx.fillText(item.id, x + paddingX, centerY);
             
             // Count (Right aligned, Bold)
-            ctx.font = 'bold 22px sans-serif';
+            ctx.font = 'bold 20px sans-serif';
             ctx.textAlign = 'right';
             ctx.fillText(`x${item.count}`, x + boxWidth - paddingX, centerY);
 
-            // Name (Centered between ID and Count)
+            // Name (Middle)
             const idWidth = ctx.measureText(item.id).width;
             const countWidth = ctx.measureText(`x${item.count}`).width;
             
-            const nameStart = x + paddingX + idWidth + 20; 
-            const nameEnd = x + boxWidth - paddingX - countWidth - 20;
-            const maxNameWidth = nameEnd - nameStart;
+            const nameX = x + paddingX + idWidth + 15;
+            const maxNameWidth = (x + boxWidth - paddingX - countWidth - 10) - nameX;
             
-            if (maxNameWidth > 0) {
-                ctx.font = 'bold 18px sans-serif';
+            if (maxNameWidth > 20) {
+                ctx.font = '16px sans-serif'; // Name slightly smaller
                 ctx.textAlign = 'left';
                 let name = item.color.name;
-                // Measure and truncate
+                
+                // Truncate if too long
                 if (ctx.measureText(name).width > maxNameWidth) {
                    while (name.length > 0 && ctx.measureText(name + '..').width > maxNameWidth) {
                        name = name.slice(0, -1);
                    }
                    name += '..';
                 }
-                ctx.fillText(name, nameStart, centerY);
+                ctx.fillText(name, nameX, centerY);
             }
         });
     }
@@ -561,14 +567,14 @@ export default function App() {
 
             {/* Toggles */}
             <div className="space-y-2 pt-2">
-              <label className="flex items-center space-x-2 cursor-pointer" title="自动去除透明背景或纯色背景">
+              <label className="flex items-center space-x-2 cursor-pointer" title="自动去除透明背景或与边缘连通的背景色">
                 <input 
                   type="checkbox" 
                   checked={settings.removeBackground}
                   onChange={(e) => setSettings(s => ({ ...s, removeBackground: e.target.checked }))}
                   className="form-checkbox text-primary rounded bg-dark border-slate-600"
                 />
-                <span className="text-sm text-yellow-300">提取主体 (去除背景)</span>
+                <span className="text-sm text-yellow-300">提取主体 (智能去背)</span>
               </label>
 
               <label className="flex items-center space-x-2 cursor-pointer">
@@ -662,6 +668,18 @@ export default function App() {
                onChange={(e) => setZoom(parseFloat(e.target.value))}
                className="w-32 accent-primary"
              />
+             
+             {imageSrc && (
+                 <label className="flex items-center space-x-2 cursor-pointer ml-4 bg-slate-800 px-3 py-1 rounded border border-slate-700 hover:border-slate-500 transition select-none">
+                    <input 
+                      type="checkbox" 
+                      checked={showReference}
+                      onChange={(e) => setShowReference(e.target.checked)}
+                      className="form-checkbox text-primary rounded bg-dark border-slate-600 w-4 h-4"
+                    />
+                    <span className="text-sm text-slate-300">显示原图</span>
+                 </label>
+             )}
           </div>
           <div className="text-xs text-slate-500">
             尺寸: {settings.width}x{settings.height} 颗 • {settings.width * 0.5} 厘米宽 (预估)
@@ -669,14 +687,35 @@ export default function App() {
         </div>
 
         {/* Canvas Container */}
-        <div className="flex-1 overflow-auto flex items-center justify-center p-8 bg-dots">
+        <div className="flex-1 overflow-auto flex items-start justify-center p-8 bg-dots relative">
           {!imageSrc ? (
-            <div className="text-center text-slate-500">
+            <div className="text-center text-slate-500 mt-20">
               <p className="text-xl mb-2">👋 欢迎使用拼豆大师</p>
               <p>请点击左侧“上传图片”开始制作图纸。</p>
             </div>
           ) : (
-             <canvas ref={canvasRef} className="shadow-2xl rounded" />
+            <div className={`flex ${showReference ? 'flex-row gap-8' : 'flex-col'} items-start justify-center transition-all duration-300`}>
+               {/* Left: Original */}
+               {showReference && (
+                 <div className="flex flex-col items-center shrink-0">
+                    <h4 className="mb-2 text-xs text-slate-400 uppercase tracking-widest font-bold">原图参考</h4>
+                    <img 
+                      src={imageSrc} 
+                      className="max-w-[400px] max-h-[75vh] object-contain rounded-lg shadow-xl border border-slate-700/50" 
+                      alt="Original"
+                    />
+                 </div>
+               )}
+
+               {/* Right: Canvas */}
+               <div className="flex flex-col items-center">
+                  {showReference && <h4 className="mb-2 text-xs text-slate-400 uppercase tracking-widest font-bold">像素预览</h4>}
+                  <canvas 
+                    ref={canvasRef} 
+                    className="shadow-2xl rounded" 
+                  />
+               </div>
+            </div>
           )}
         </div>
       </div>
